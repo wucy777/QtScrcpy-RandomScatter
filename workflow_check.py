@@ -231,6 +231,50 @@ def main():
     check(re.search(r"path:\s*\$\{\{\s*github\.workspace\s*\}\}/Qt/", text) is not None,
           "Qt cache path matches install-qt-action's <dir>/Qt layout")
 
+    # ---------------------------------------------------------- 键位投放位置
+    # 踩过坑：一开始把调教好的键位放到 keymap-tuned/ 子目录，结果 QtScrcpy 的
+    # 脚本下拉框用 QDir::Files 列目录（不递归），子目录里的 json 根本选不到。
+    # 必须平铺进 keymap/。
+    # 只查「代码里是否真的建了子目录」：
+    #   * 注释里提到它（解释为什么不用）不算
+    #   * 断言 / 报错行（Test-Path ... throw）不算 —— 那是防回归的守卫
+    def code_lines(src):
+        out = []
+        for l in src.splitlines():
+            s = l.strip()
+            if s.startswith(("#", "//", "rem", "::")):
+                continue
+            # 守卫行：只在检查它是否存在，或者拿它当错误信息
+            if re.search(r"(Test-Path|throw|Write-Host|::error|::warning)", s) \
+               and re.search(r"Test-Path|throw", s):
+                continue
+            out.append(l)
+        return out
+
+    wf_code = "\n".join(code_lines(text))
+    check("keymap-tuned" not in wf_code,
+          "workflow does NOT create a keymap-tuned/ subfolder"
+          if "keymap-tuned" not in wf_code else
+          "workflow code references keymap-tuned/, which QtScrcpy cannot list")
+    # 本地 keymap/ 里要有那份调教好的 json
+    km = os.path.join(HERE, "keymap")
+    if os.path.isdir(km):
+        jsons = [f for f in os.listdir(km) if f.endswith(".json")]
+        check(len(jsons) >= 2, f"keymap/ ships {len(jsons)} json file(s)")
+        check(any("随机散布" in f for f in jsons),
+              "keymap/ contains the tuned random-scatter keymap")
+    # package_win.ps1 必须把键位平铺进 keymap/
+    pw = os.path.join(HERE, "package_win.ps1")
+    if os.path.exists(pw):
+        psrc = open(pw, encoding="utf-8").read()
+        check("installing the tuned keymap" in psrc,
+              "package_win.ps1 installs the tuned keymap")
+        ps_code = "\n".join(code_lines(psrc))
+        check("keymap-tuned" not in ps_code,
+              "package_win.ps1 does not create a keymap-tuned/ subfolder"
+              if "keymap-tuned" not in ps_code else
+              "package_win.ps1 creates a keymap-tuned/ subfolder")
+
     print()
     if FAIL:
         print(f"WORKFLOW CHECK FAILED: {len(FAIL)}")

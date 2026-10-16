@@ -92,6 +92,26 @@ foreach ($pair in @(@('keymap', 'keymap'), @('config', 'config'))) {
     }
 }
 
+# The tuned keymap goes FLAT into keymap/, not into a keymap-tuned/ subfolder.
+# QtScrcpy's script dropdown uses QDir::entryInfoList(..., QDir::Files) with no
+# recursion (ui/dialog.cpp:1379), so anything in a subdirectory is invisible
+# and cannot be selected. Keeping it flat also means initializeKeyMapDirectory()
+# copies it into the user's AppData keymap folder on first run.
+Step 'installing the tuned keymap'
+$tunedSrc = Join-Path $repoRoot 'keymap'
+$keymapDst = Join-Path $outDir 'keymap'
+if (Test-Path -LiteralPath $tunedSrc) {
+    New-Item -ItemType Directory -Force -Path $keymapDst | Out-Null
+    $tuned = Get-ChildItem -LiteralPath $tunedSrc -Filter *.json -File
+    if (-not $tuned) { throw "no .json files in $tunedSrc" }
+    foreach ($f in $tuned) {
+        Copy-Item -LiteralPath $f.FullName -Destination $keymapDst -Force
+        Write-Host "   $($f.Name)"
+    }
+} else {
+    Write-Host '   [warn] no keymap/ folder in this repo; shipping upstream defaults only'
+}
+
 # ------------------------------------------------------------------ deploy Qt
 Step 'running windeployqt'
 $env:Path = "$qtBin;$env:Path"

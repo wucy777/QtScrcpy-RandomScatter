@@ -239,16 +239,21 @@ jobs:
         shell: pwsh
         env:
           PUBLISH_NAME: ${{ env.TARGET_NAME }}-win-${{ matrix.msvc-arch }}-4.2.1
-          TUNED_KEYMAP: keymap/和平精英-默认键位-随机散布.json
         run: |
-          $dst = "src\ci\build\$env:PUBLISH_NAME\keymap-tuned"
-          New-Item -ItemType Directory -Force -Path $dst | Out-Null
-          if (Test-Path 'keymap') {
-            Copy-Item 'keymap/*.json' $dst -Force -ErrorAction SilentlyContinue
-            Get-ChildItem $dst | Select-Object Name
-          } else {
-            Write-Host "::warning::no tuned keymap folder in this repo"
+          # 调教好的键位必须平铺进 keymap/，不能放子目录：
+          # QtScrcpy 的脚本下拉框用 QDir::Files 不递归（ui/dialog.cpp:1379），
+          # 子目录里的 json 选不到。package_win.ps1 已经处理，这里只做确认。
+          $dst = "src\ci\build\$env:PUBLISH_NAME\keymap"
+          if (-not (Test-Path $dst)) { throw "keymap dir missing: $dst" }
+          $tuned = Get-ChildItem $dst -Filter '*随机散布*.json' -File
+          if (-not $tuned) {
+            Write-Host "::error::tuned keymap is not in keymap/ as a top-level .json"
+            Get-ChildItem $dst | ForEach-Object { Write-Host "   $($_.Name)" }
+            throw 'tuned keymap not selectable in the dropdown'
           }
+          $tuned | ForEach-Object { Write-Host "   tuned keymap: $($_.Name)" }
+          Write-Host "all keymap json:"
+          Get-ChildItem $dst -Filter *.json -File | ForEach-Object { Write-Host "   $($_.Name)" }
 
       - name: Sanity check the package
         shell: pwsh
@@ -259,16 +264,19 @@ jobs:
           if (-not (Test-Path $dir)) { throw "package directory missing: $dir" }
           Get-ChildItem $dir | Select-Object -First 30 Name
           foreach ($need in @('QtScrcpy.exe', 'adb.exe', 'scrcpy-server', 'keymap',
-                              'config', 'keymap-tuned', 'Qt5Core.dll', 'Qt5Gui.dll',
+                              'config', 'Qt5Core.dll', 'Qt5Gui.dll',
                               'Qt5Widgets.dll')) {
             if (-not (Test-Path "$dir\$need")) { throw "missing in package: $need" }
           }
+          # 调教好的键位必须能在这个下拉框里选到 -> 必须是 keymap/ 下的顶层 json
+          if (-not (Test-Path "$dir\keymap\和平精英-默认键位-随机散布.json")) {
+            throw 'tuned keymap missing from keymap/'
+          }
+          if (Test-Path "$dir\keymap-tuned") {
+            throw 'keymap-tuned/ subfolder is not selectable in QtScrcpy; put the json flat in keymap/'
+          }
           $total = (Get-ChildItem $dir -Recurse -File | Measure-Object -Property Length -Sum).Sum
           Write-Host ("package: {0} files, {1:N1} MB" -f (Get-ChildItem $dir -Recurse -File).Count, ($total / 1MB))
-          # 随包发布了调教好的键位，确认它真的在里面
-          $tuned = Get-ChildItem "$dir\keymap-tuned" -Filter *.json -ErrorAction SilentlyContinue
-          if (-not $tuned) { throw 'keymap-tuned is empty' }
-          $tuned | ForEach-Object { Write-Host "   tuned keymap: $($_.Name)" }
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
