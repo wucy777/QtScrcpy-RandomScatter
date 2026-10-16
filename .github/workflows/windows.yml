@@ -41,8 +41,11 @@ jobs:
           fi
           echo "patch-only repo OK"
 
-      - name: Workflow self-check (strict: before upstream is fetched)
-        run: python3 workflow_check.py
+      - name: Workflow self-check (strict, runs before upstream is fetched)
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 workflow_check.py
+          python3 miniyaml.py .github/workflows/windows.yml
 
       - name: Fetch pinned upstream sources
         run: |

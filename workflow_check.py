@@ -24,6 +24,53 @@ def main():
     text = open(WF, encoding="utf-8").read()
     lines = text.splitlines()
 
+    # ---------------------------------------------------------- YAML 合法性
+    # 这一步很关键：YAML 里未加引号的 `name: 文本: 更多文本` 会被解析成
+    # 嵌套映射，GitHub 侧的报错是「workflow 名字变成文件路径」然后整个 run
+    # 直接失败、连 job 都不建，极难查。有 PyYAML 就真解析，没有就用自带的
+    # miniyaml 做针对性校验。
+    parsed = False
+    try:
+        import yaml  # type: ignore
+        try:
+            doc = yaml.safe_load(text)
+            check(isinstance(doc, dict), "workflow parses as a YAML mapping")
+            trig = doc.get("on", doc.get(True))
+            check(isinstance(trig, dict) and bool(trig),
+                  "workflow has a non-empty 'on:' trigger")
+            jobs_doc = doc.get("jobs") or {}
+            check(isinstance(jobs_doc, dict) and bool(jobs_doc), "workflow has jobs")
+            for jname, job in (jobs_doc or {}).items():
+                if not isinstance(job, dict):
+                    continue
+                for s in job.get("steps", []) or []:
+                    check(isinstance(s, dict) and isinstance(s.get("name"), str),
+                          f"{jname}: every step has a plain string name")
+            print("      (validated with PyYAML)")
+            parsed = True
+        except Exception as e:
+            check(False, f"workflow YAML parses ({type(e).__name__}: {e})")
+            parsed = True
+    except ImportError:
+        pass
+
+    if not parsed:
+        sys.path.insert(0, HERE)
+        import miniyaml  # noqa: E402
+        probs = miniyaml.validate(text)
+        for n, msg in probs:
+            print(f"      line {n}: {msg}")
+        check(not probs,
+              "no YAML scalar traps (e.g. unquoted colon in a step name)"
+              if not probs else f"{len(probs)} YAML scalar problem(s)")
+        # 正向确认：序列项确实被识别成了「键: 值」而不是嵌套映射
+        step_names = re.findall(r"^\s*-\s*name:\s*(.+)$", text, re.M)
+        check(len(step_names) >= 8,
+              f"miniyaml saw {len(step_names)} step names (expected >= 8)")
+        check(all(": " not in n for n in step_names),
+              "no step name contains ': '")
+        print("      (validated with miniyaml; PyYAML unavailable)")
+
     # ---------------------------------------------------------- 基本结构
     check(lines[0].startswith("name:"), "workflow starts with name:")
     check(re.search(r"^on:", text, re.M) is not None, "has 'on:' trigger block")
