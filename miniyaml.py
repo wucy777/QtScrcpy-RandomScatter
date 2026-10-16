@@ -18,6 +18,15 @@
 """
 
 import re
+import sys
+
+# Windows 上 Python 默认把 stdout 编成 cp936/cp1252，打印中文会抛
+# UnicodeEncodeError 直接弄崩脚本（CI 上真踩过）。统一改 UTF-8。
+for _s in (sys.stdout, sys.stderr):
+    try:
+        _s.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 KEY_RE = re.compile(r"^(\s*)([A-Za-z_][\w.\-]*)\s*:(?:\s+(.*))?$")
 ITEM_RE = re.compile(r"^(\s*)-\s*(.*)$")

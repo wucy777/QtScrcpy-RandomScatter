@@ -25,6 +25,14 @@ import os
 import shutil
 import sys
 
+# Windows 上 Python 默认把 stdout 编成 cp936/cp1252，打印中文会直接抛
+# UnicodeEncodeError 把脚本弄崩（CI 上就踩过这个坑）。统一改 UTF-8。
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 FILES = os.path.join(HERE, "files")
 DEFAULT_DIFF = os.path.join(HERE, "random-scatter.patch")

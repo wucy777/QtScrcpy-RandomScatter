@@ -9,6 +9,14 @@ import os
 import re
 import sys
 
+# Windows 上 Python 默认把 stdout 编成 cp936/cp1252，打印中文会抛
+# UnicodeEncodeError 直接弄崩脚本（CI 上真踩过）。统一改 UTF-8。
+for _s in (sys.stdout, sys.stderr):
+    try:
+        _s.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 WF = os.path.join(HERE, ".github", "workflows", "windows.yml")
 FAIL = []
@@ -175,6 +183,30 @@ def main():
     # ---------------------------------------------------------- 中文路径
     check("keymap/" in text and "tuned" in text.lower(),
           "ships the tuned keymap as a separate step")
+
+    # ---------------------------------------------------------- 控制台编码
+    # CI 上真踩过：Windows runner 的 Python 把 stdout 编成 cp1252，脚本里
+    # 打印中文的 print() 直接抛 UnicodeEncodeError 把构建搞挂。
+    # 所有会打印非 ASCII 的脚本都必须自己把 stdout 改成 UTF-8。
+    for name in ("apply_patch.py", "static_check.py", "workflow_check.py",
+                 "miniyaml.py", "ci_sim.py"):
+        p = os.path.join(HERE, name)
+        if not os.path.exists(p):
+            continue
+        src = open(p, encoding="utf-8").read()
+        has_non_ascii = any(ord(c) > 127 for c in src)
+        if not has_non_ascii:
+            continue
+        guard = re.search(
+            r"for\s+_\w+\s+in\s+\(sys\.stdout,\s*sys\.stderr\)\s*:.*?reconfigure\(\s*encoding",
+            src, re.S)
+        if guard is None:
+            # 也接受逐个流 reconfigure 的写法
+            guard = re.search(r"sys\.stdout\.reconfigure\(\s*encoding", src)
+        check(guard is not None,
+              f"{name}: forces UTF-8 stdout (prints non-ASCII, cp1252 runner would crash)"
+              if guard else
+              f"{name}: prints non-ASCII but does NOT reconfigure stdout to UTF-8")
 
     print()
     if FAIL:

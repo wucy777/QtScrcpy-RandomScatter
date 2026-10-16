@@ -108,7 +108,7 @@ jobs:
           target: desktop
           arch: ${{ matrix.qt-arch }}
           dir: ${{ github.workspace }}
-          cached: ${{ steps.cache-qt.outputs.cache-hit }}
+          cache: ${{ steps.cache-qt.outputs.cache-hit != 'true' }}
 
       - name: Fetch upstream QtScrcpy ${{ env.UPSTREAM_TAG }}
         shell: pwsh
