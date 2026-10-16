@@ -1,0 +1,23 @@
+# 生成的临时 / 中间产物，不进仓库
+_cache/
+__pycache__/
+*.pyc
+
+# 开发用的「改好的完整文件」。
+# 仓库必须保持 patch-only：只放 diff 文本，不放第三方源码。
+# 本地开发时可以生成 files/ 方便对照，但绝不会被提交。
+files/
+
+# 编译中间产物
+*.obj
+*.exe
+test_scatter
+*.pdb
+*.ilk
+
+# 桩头文件（gen_stubs.py 生成，仅本地语法检查用）
+stubs/
+
+# GUI 冒烟测试的截图产物
+gui_smoke.png
+gui_smoke.json

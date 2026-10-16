@@ -1,0 +1,237 @@
+name: Windows random-scatter build
+
+# 本仓库不包含上游源码。CI 会现场拉取：
+#   * barry-ran/QtScrcpy     标签 v4.2.1
+#   * barry-ran/QtScrcpyCore 提交 9e388b8a…（v4.2.1 锁定的那一个）
+# 然后套用 files/ 下的随机散布补丁，用 Qt 5.15.2 + MSVC 编译。
+#
+# 产物：可直接运行的 Windows x64 / x86 目录（artifact）。
+
+on:
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - '**/*.md'
+  pull_request:
+  workflow_dispatch:
+
+env:
+  UPSTREAM_TAG: v4.2.1
+  QTSCRCPYCORE_SHA: 9e388b8aa48e4e1c2cfdef408ef00c4c6b45c921
+  TARGET_NAME: QtScrcpy-RandomScatter
+
+jobs:
+  # 先跑不需要 Qt 的前置检查（Ubuntu 便宜），快速失败，省 Windows CI 时间。
+  # 这里也把上游拉下来打一次补丁，用来跑静态检查 —— 保证检查的是真树。
+  preflight:
+    name: Preflight (no Qt)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reject vendored third-party source
+        run: |
+          # 本仓库只允许有自己的脚本 + 补丁文本，不得携带 QtScrcpy 源码
+          bad=$(find . -path ./.git -prune -o -type f \( -name '*.cpp' -o -name '*.h' \) -print \
+                | grep -v '^./test_scatter.cpp$' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::repo contains C++ sources (should be patch-only):"
+            echo "$bad"
+            exit 1
+          fi
+          echo "patch-only repo OK"
+
+      - name: Fetch pinned upstream sources
+        run: |
+          set -e
+          curl -sSL -o app.tar.gz  "https://codeload.github.com/barry-ran/QtScrcpy/tar.gz/refs/tags/$UPSTREAM_TAG"
+          curl -sSL -o core.tar.gz "https://codeload.github.com/barry-ran/QtScrcpyCore/tar.gz/$QTSCRCPYCORE_SHA"
+          mkdir -p src
+          tar -xzf app.tar.gz --strip-components=1 -C src
+          test -f src/QtScrcpy/CMakeLists.txt
+          mkdir -p src/QtScrcpy/QtScrcpyCore
+          tar -xzf core.tar.gz --strip-components=1 -C src/QtScrcpy/QtScrcpyCore
+          test -f src/QtScrcpy/QtScrcpyCore/src/device/controller/inputconvert/inputconvertgame.cpp
+          echo "upstream ready"
+
+      - name: Apply patch with the pure-python applier
+        run: |
+          python3 apply_patch.py src
+          python3 apply_patch.py src --check   # 幂等：再检查一次应当 0 个文件需要改
+
+      - name: Static consistency check on the patched tree
+        run: python3 static_check.py --tree src/QtScrcpy/QtScrcpyCore
+
+      - name: Build and run the scatter math + chi-square tests
+        run: |
+          g++ -std=c++17 -O2 -Wall -Wextra -o test_scatter test_scatter.cpp
+          ./test_scatter
+
+      - name: Workflow self-check
+        run: python3 workflow_check.py
+
+  build:
+    name: Build ${{ matrix.msvc-arch }}
+    needs: preflight
+    runs-on: windows-2022
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - qt-arch: win64_msvc2019_64
+            qt-arch-install: msvc2019_64
+            msvc-arch: x64
+          - qt-arch: win32_msvc2019
+            qt-arch-install: msvc2019
+            msvc-arch: x86
+
+    steps:
+      - name: Checkout patch repo
+        uses: actions/checkout@v4
+
+      - name: Cache Qt
+        id: cache-qt
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/5.15.2/${{ matrix.qt-arch-install }}
+          key: ${{ runner.os }}-qt5.15.2-${{ matrix.qt-arch }}
+
+      - name: Install Qt 5.15.2
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: 5.15.2
+          target: desktop
+          arch: ${{ matrix.qt-arch }}
+          dir: ${{ github.workspace }}
+          cached: ${{ steps.cache-qt.outputs.cache-hit }}
+
+      - name: Fetch upstream QtScrcpy ${{ env.UPSTREAM_TAG }}
+        shell: pwsh
+        run: |
+          curl.exe -sSL -o app.tar.gz "https://codeload.github.com/barry-ran/QtScrcpy/tar.gz/refs/tags/$env:UPSTREAM_TAG"
+          if ($LASTEXITCODE -ne 0) { throw 'download failed' }
+          tar -xzf app.tar.gz
+          $d = Get-ChildItem -Directory | Where-Object { $_.Name -like 'QtScrcpy-4*' } | Select-Object -First 1
+          if (-not $d) { throw 'upstream extraction failed' }
+          Move-Item $d.FullName src
+          if (-not (Test-Path 'src/QtScrcpy/CMakeLists.txt')) { throw 'unexpected upstream layout' }
+          Write-Host "appversion: $(Get-Content 'src/QtScrcpy/appversion')"
+
+      - name: Fetch pinned QtScrcpyCore ${{ env.QTSCRCPYCORE_SHA }}
+        shell: pwsh
+        run: |
+          curl.exe -sSL -o core.tar.gz "https://codeload.github.com/barry-ran/QtScrcpyCore/tar.gz/$env:QTSCRCPYCORE_SHA"
+          if ($LASTEXITCODE -ne 0) { throw 'download failed' }
+          tar -xzf core.tar.gz
+          $d = Get-ChildItem -Directory | Where-Object { $_.Name -like 'QtScrcpyCore-*' } | Select-Object -First 1
+          if (-not $d) { throw 'core extraction failed' }
+          New-Item -ItemType Directory -Force -Path 'src/QtScrcpy/QtScrcpyCore' | Out-Null
+          Copy-Item "$($d.FullName)/*" 'src/QtScrcpy/QtScrcpyCore' -Recurse -Force
+          if (-not (Test-Path 'src/QtScrcpy/QtScrcpyCore/CMakeLists.txt')) { throw 'unexpected core layout' }
+
+      - name: Apply random-scatter patch
+        shell: pwsh
+        run: |
+          # 本仓库只有 diff 文本，不含任何第三方源码。
+          # apply_patch.py 是纯 Python 实现，不需要 git。
+          python apply_patch.py src
+          if ($LASTEXITCODE -ne 0) { throw 'patch failed' }
+
+      - name: Verify the patch really landed in the tree
+        shell: pwsh
+        run: |
+          $g = 'src/QtScrcpy/QtScrcpyCore/src/device/controller/inputconvert/inputconvertgame.cpp'
+          $n = (Select-String -Path $g -Pattern 'scatterPos' -AllMatches).Count
+          Write-Host "scatterPos occurrences: $n"
+          if ($n -lt 4) { throw 'inputconvertgame.cpp patch missing' }
+          if (-not (Select-String -Path $g -Pattern 'nextGauss')) { throw 'gauss sampling missing' }
+          $k = 'src/QtScrcpy/QtScrcpyCore/src/device/controller/inputconvert/keymap/keymap.cpp'
+          if (-not (Select-String -Path $k -Pattern 'getItemRandomPos')) { throw 'keymap.cpp patch missing' }
+          if (-not (Select-String -Path $k -Pattern 'RD_GAUSS')) { throw 'dist parsing missing' }
+          $h = 'src/QtScrcpy/QtScrcpyCore/src/device/controller/inputconvert/keymap/keymap.h'
+          if (-not (Select-String -Path $h -Pattern 'struct RandomPos')) { throw 'keymap.h patch missing' }
+          # 静态检查直接跑在打过补丁的树上
+          python static_check.py --tree src/QtScrcpy/QtScrcpyCore
+          if ($LASTEXITCODE -ne 0) { throw 'static check failed' }
+          # 确认没有把第三方源码带进仓库
+          $vendored = Get-ChildItem -Recurse -File -Include *.cpp,*.h |
+                      Where-Object { $_.FullName -notmatch '\\src\\QtScrcpy\\' }
+          if ($vendored) {
+            Write-Host "::error::repo contains C++ sources outside the fetched upstream tree"
+            $vendored | ForEach-Object { Write-Host $_.FullName }
+            throw 'vendored third-party source detected'
+          }
+          Write-Host "repo is patch-only: no vendored C++ sources"
+
+      - name: Resolve MSVC environment
+        shell: pwsh
+        run: |
+          # build_for_win.bat 靠 cmake 自己找工具链，不需要 vcvarsall；
+          # 但 publish_for_win.bat 要 call 它（为了 windeployqt 和 vc 运行时）。
+          # 不同 runner 镜像的安装位置不一样，这里两个都试一遍。
+          $cands = @(
+            'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat',
+            'C:\Program Files (x86)\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat',
+            'C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvarsall.bat',
+            'C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat',
+            'C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat'
+          )
+          $v = $cands | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $v) { throw 'vcvarsall.bat not found on this runner' }
+          Write-Host "vcvarsall: $v"
+          "ENV_VCVARSALL=$v" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $vc = Split-Path (Split-Path (Split-Path $v -Parent) -Parent) -Parent
+          Write-Host "VC root: $vc"
+          "ENV_VCINSTALL=$vc" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Build
+        shell: cmd
+        env:
+          ENV_QT_PATH: ${{ github.workspace }}\5.15.2
+        run: |
+          call "ci\win\build_for_win.bat" RelWithDebInfo ${{ matrix.msvc-arch }}
+        working-directory: src
+
+      - name: Package
+        shell: pwsh
+        env:
+          ENV_QT_PATH: ${{ github.workspace }}\5.15.2
+          PUBLISH_NAME: ${{ env.TARGET_NAME }}-win-${{ matrix.msvc-arch }}-4.2.1
+        run: |
+          cmd.exe /c ci\win\publish_for_win.bat ${{ matrix.msvc-arch }} "..\build\$env:PUBLISH_NAME"
+          if (-not (Test-Path "ci\build\$env:PUBLISH_NAME\QtScrcpy.exe")) { throw 'publish produced no exe' }
+        working-directory: src
+
+      - name: Ship the tuned China keymap with the build
+        shell: pwsh
+        env:
+          PUBLISH_NAME: ${{ env.TARGET_NAME }}-win-${{ matrix.msvc-arch }}-4.2.1
+          TUNED_KEYMAP: keymap/和平精英-默认键位-随机散布.json
+        run: |
+          $dst = "src\ci\build\$env:PUBLISH_NAME\keymap-tuned"
+          New-Item -ItemType Directory -Force -Path $dst | Out-Null
+          if (Test-Path 'keymap') {
+            Copy-Item 'keymap/*.json' $dst -Force -ErrorAction SilentlyContinue
+            Get-ChildItem $dst | Select-Object Name
+          } else {
+            Write-Host "::warning::no tuned keymap folder in this repo"
+          }
+
+      - name: Sanity check the package
+        shell: pwsh
+        env:
+          PUBLISH_NAME: ${{ env.TARGET_NAME }}-win-${{ matrix.msvc-arch }}-4.2.1
+        run: |
+          $dir = "src\ci\build\$env:PUBLISH_NAME"
+          Get-ChildItem $dir | Select-Object -First 30 Name
+          foreach ($need in @('QtScrcpy.exe', 'adb.exe', 'scrcpy-server', 'keymap', 'config')) {
+            if (-not (Test-Path "$dir\$need")) { throw "missing in package: $need" }
+          }
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.TARGET_NAME }}-win-${{ matrix.msvc-arch }}-4.2.1
+          path: src/ci/build/${{ env.TARGET_NAME }}-win-${{ matrix.msvc-arch }}-4.2.1
+          if-no-files-found: error

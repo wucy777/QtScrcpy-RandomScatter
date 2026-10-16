@@ -1,0 +1,9 @@
+# 补丁文件必须保持 LF：它们是逐字节覆盖到上游源码上的，
+# 若被 checkout 成 CRLF，和 random-scatter.patch 就不再一致了。
+* text=auto eol=lf
+
+*.bat text eol=crlf
+
+*.png binary
+*.jpg binary
+*.ico binary

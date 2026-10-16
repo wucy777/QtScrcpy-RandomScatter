@@ -1,0 +1,579 @@
+--- a/src/device/controller/inputconvert/keymap/keymap.h
++++ b/src/device/controller/inputconvert/keymap/keymap.h
+@@ -38,10 +38,54 @@
+     };
+     Q_ENUM(ActionType)
+ 
++    // 随机散布区域（改版新增，原版 QtScrcpy 会忽略该字段）：
++    //   RS_CIRCLE: p1 = 圆心，p2 = 圆周上任意一点（两点在屏幕上的像素距离即半径）
++    //   RS_RECT  : p1 = 左上角，p2 = 右下角
++    // shape 为 RS_NONE 时行为与官方版本完全一致（固定坐标点击）。
++    //
++    // 落点概率分布（dist）：
++    //   RD_UNIFORM —— 区域内均匀随机。默认值，保证早期导出的 JSON 行为不变。
++    //   RD_GAUSS   —— 以区域中心为峰的二维高斯分布（越靠中心越密、越靠边缘越稀）。
++    //
++    // 为什么默认不是均匀：真人按按钮时手指是往按钮中间落，中心密、边缘稀，
++    // 呈钟形分布。**均匀随机的统计特征本身就是一种指纹** —— 把落点按同心环
++    // 或等分格统计计数，各环/格数量近似相等，一眼就能看出是程序生成的。
++    struct RandomPos
++    {
++        enum Shape
++        {
++            RS_NONE = 0,
++            RS_CIRCLE,
++            RS_RECT,
++        };
++
++        enum Dist
++        {
++            RD_UNIFORM = 0,
++            RD_GAUSS,
++        };
++
++        Shape shape = RS_NONE;
++        QPointF p1 = QPointF(0, 0);
++        QPointF p2 = QPointF(0, 0);
++        Dist dist = RD_UNIFORM;
++        // 高斯标准差占「半径 / 半宽」的比例，越小越集中在中心。
++        // 0.4 时约 68% 的落点落在半径的 40% 以内。
++        double sigma = 0.40;
++        // 偶发「点偏了」的概率：以该概率改用区域内均匀采样，制造重尾。
++        // 真人不会每次都精准，留一点小概率大幅偏移更自然。0 表示关闭。
++        double outlier = 0.0;
++
++        bool isValid() const { return RS_NONE != shape; }
++    };
++
+     struct DelayClickNode
+     {
+         int delay = 0;
+         QPointF pos = QPointF(0, 0);
++
++        // 可选：单个点击节点的随机散布区域
++        RandomPos random;
+     };
+ 
+     struct KeyNode
+@@ -54,6 +98,7 @@
+         DelayClickNode delayClickNodes[MAX_DELAY_CLICK_NODES]; // for multi clicks
+         int delayClickNodesCount = 0;
+         AndroidKeycode androidKey = AKEYCODE_UNKNOWN;          // for key press
++        RandomPos random;                                      // 随机散布区域（可选）
+ 
+         KeyNode(
+             ActionType type = AT_INVALID,
+@@ -101,6 +146,7 @@
+                 QPointF startPos   = { 0.0, 0.0 };
+                 QPointF speedRatio = { 1.0, 1.0 };
+                 KeyNode smallEyes;
++                RandomPos startRandom;   // 可选：视角拖动起始点随机散布
+             } mouseMove;
+             struct
+             {
+@@ -138,6 +184,9 @@
+     bool checkItemBool(const QJsonObject &node, const QString &name);
+     bool checkItemObject(const QJsonObject &node, const QString &name);
+     bool checkItemPos(const QJsonObject &node, const QString &name);
++
++    // 随机散布区域解析（可选字段；缺失或非法时静默退回固定坐标）
++    RandomPos getItemRandomPos(const QJsonObject &node, const QString &name);
+ 
+     // safe check for KeyMapNode
+     bool checkForClick(const QJsonObject &node);
+--- a/src/device/controller/inputconvert/keymap/keymap.cpp
++++ b/src/device/controller/inputconvert/keymap/keymap.cpp
+@@ -94,6 +94,8 @@
+         if (checkItemDouble(startPos, "y")) {
+             keyMapNode.data.mouseMove.startPos.setY(getItemDouble(startPos, "y"));
+         }
++        // 可选：视角拖动起始点的随机散布区域
++        keyMapNode.data.mouseMove.startRandom = getItemRandomPos(mouseMoveMap, "startRandomPos");
+ 
+         // small eyes
+         if (checkItemObject(mouseMoveMap, "smallEyes")) {
+@@ -125,6 +127,7 @@
+             keyMapNode.data.mouseMove.smallEyes.type = key.first;
+             keyMapNode.data.mouseMove.smallEyes.key = key.second;
+             keyMapNode.data.mouseMove.smallEyes.pos = getItemPos(smallEyes, "pos");
++            keyMapNode.data.mouseMove.smallEyes.random = getItemRandomPos(smallEyes, "randomPos");
+         }
+ 
+         m_idxMouseMove = m_keyMapNodes.size();
+@@ -167,6 +170,7 @@
+                 keyMapNode.data.click.keyNode.pos = getItemPos(node, "pos");
+                 keyMapNode.data.click.switchMap = getItemBool(node, "switchMap");
+                 keyMapNode.data.click.keyNode.androidKey = static_cast<AndroidKeycode>(getItemDouble(node, "androidKey"));
++                keyMapNode.data.click.keyNode.random = getItemRandomPos(node, "randomPos");
+                 m_keyMapNodes.push_back(keyMapNode);
+             } break;
+             case KeyMap::KMT_CLICK_TWICE: {
+@@ -188,6 +192,7 @@
+                 keyMapNode.data.click.keyNode.pos = getItemPos(node, "pos");
+                 keyMapNode.data.click.switchMap = getItemBool(node, "switchMap");
+                 keyMapNode.data.click.keyNode.androidKey = static_cast<AndroidKeycode>(getItemDouble(node, "androidKey"));
++                keyMapNode.data.click.keyNode.random = getItemRandomPos(node, "randomPos");
+                 m_keyMapNodes.push_back(keyMapNode);
+             } break;
+             case KeyMap::KMT_CLICK_MULTI: {
+@@ -219,6 +224,7 @@
+                     DelayClickNode delayClickNode;
+                     delayClickNode.delay = getItemDouble(clickNode, "delay");
+                     delayClickNode.pos = getItemPos(clickNode, "pos");
++                    delayClickNode.random = getItemRandomPos(clickNode, "randomPos");
+                     keyMapNode.data.clickMulti.keyNode.delayClickNodes[i] = delayClickNode;
+                     keyMapNode.data.clickMulti.keyNode.delayClickNodesCount++;
+                 }
+@@ -281,6 +287,7 @@
+                 keyMapNode.data.drag.keyNode.key = key.second;
+                 keyMapNode.data.drag.keyNode.pos = getItemPos(node, "startPos");
+                 keyMapNode.data.drag.keyNode.extendPos = getItemPos(node, "endPos");
++                keyMapNode.data.drag.keyNode.random = getItemRandomPos(node, "randomPos");
+                 // Read optional drag delay parameters
+                 keyMapNode.data.drag.startDelay = node.contains("startDelay") ? 
+                     static_cast<quint32>(getItemDouble(node, "startDelay")) : 0;
+@@ -552,3 +559,74 @@
+ {
+     return checkItemString(node, "key") && checkItemPos(node, "startPos") && checkItemPos(node, "endPos");
+ }
++
++// ---------------------------------------------------------------------------
++// 随机散布区域（改版新增）
++// ---------------------------------------------------------------------------
++
++// 校验 randomPos 字段结构是否可用；不合法就当没写，退回固定坐标
++KeyMap::RandomPos KeyMap::getItemRandomPos(const QJsonObject &node, const QString &name)
++{
++    RandomPos result;
++
++    if (!node.contains(name) || !node.value(name).isObject()) {
++        // 字段缺失：原版 keymap，静默退回固定坐标
++        return result;
++    }
++
++    QJsonObject obj = node.value(name).toObject();
++    if (!checkItemString(obj, "type") || !checkItemPos(obj, "p1") || !checkItemPos(obj, "p2")) {
++        qWarning() << "json warning: randomPos format error, fallback to fixed pos";
++        return result;
++    }
++
++    const QString shape = obj.value("type").toString();
++    if (0 == shape.compare(QStringLiteral("circle"), Qt::CaseInsensitive)) {
++        result.shape = RandomPos::RS_CIRCLE;
++    } else if (0 == shape.compare(QStringLiteral("rect"), Qt::CaseInsensitive)) {
++        result.shape = RandomPos::RS_RECT;
++    } else {
++        qWarning() << "json warning: unknown randomPos type, fallback to fixed pos:" << shape;
++        return result;
++    }
++
++    result.p1 = getItemPos(obj, "p1");
++    result.p2 = getItemPos(obj, "p2");
++
++    // ---- 可选：概率分布。缺失时保持 RD_UNIFORM，早期导出的 JSON 行为不变。
++    // 但确实建议用 gauss —— 均匀随机的统计特征太显眼，见 keymap.h 里的说明。
++    if (checkItemString(obj, "dist")) {
++        const QString dist = obj.value("dist").toString();
++        if (0 == dist.compare(QStringLiteral("gauss"), Qt::CaseInsensitive)
++            || 0 == dist.compare(QStringLiteral("normal"), Qt::CaseInsensitive)
++            || 0 == dist.compare(QStringLiteral("gaussian"), Qt::CaseInsensitive)) {
++            result.dist = RandomPos::RD_GAUSS;
++        } else if (0 == dist.compare(QStringLiteral("uniform"), Qt::CaseInsensitive)) {
++            result.dist = RandomPos::RD_UNIFORM;
++        } else {
++            qWarning() << "json warning: unknown randomPos dist, use uniform:" << dist;
++        }
++    }
++
++    if (checkItemDouble(obj, "sigma")) {
++        const double sigma = getItemDouble(obj, "sigma");
++        // 夹到合理区间：太小会退化成固定点，太大就接近均匀了
++        if (sigma >= 0.05 && sigma <= 2.0) {
++            result.sigma = sigma;
++        } else {
++            qWarning() << "json warning: randomPos sigma out of range, use default:" << sigma;
++        }
++    }
++
++    if (checkItemDouble(obj, "outlier")) {
++        const double outlier = getItemDouble(obj, "outlier");
++        if (outlier >= 0.0 && outlier <= 1.0) {
++            result.outlier = outlier;
++        } else {
++            qWarning() << "json warning: randomPos outlier out of range, ignore:" << outlier;
++        }
++    }
++
++    return result;
++}
++
+--- a/src/device/controller/inputconvert/inputconvertgame.h
++++ b/src/device/controller/inputconvert/inputconvertgame.h
+@@ -3,6 +3,7 @@
+ 
+ #include <QPointF>
+ #include <QQueue>
++#include <QHash>
+ 
+ #include "inputconvertnormal.h"
+ #include "keymap.h"
+@@ -40,14 +41,18 @@
+     // steer wheel
+     void processSteerWheel(const KeyMap::KeyMapNode &node, const QKeyEvent *from);
+ 
++    // 随机散布：把相对坐标按 randomPos 配置散布到圆内 / 矩形内。
++    // randomPos 为空（原版 keymap）时原样返回 pos，行为与官方版本一致。
++    QPointF scatterPos(const QPointF &pos, const KeyMap::RandomPos &randomPos);
++
+     // click
+-    void processKeyClick(const QPointF &clickPos, bool clickTwice, bool switchMap, const QKeyEvent *from);
++    void processKeyClick(const QPointF &clickPos, const KeyMap::RandomPos &randomPos, bool clickTwice, bool switchMap, const QKeyEvent *from);
+ 
+     // click mutil
+     void processKeyClickMulti(const KeyMap::DelayClickNode *nodes, const int count, const QKeyEvent *from);
+ 
+     // drag
+-    void processKeyDrag(const QPointF &startPos, QPointF endPos, quint32 startDelay, float dragSpeed, const QKeyEvent *from);
++    void processKeyDrag(const QPointF &startPos, QPointF endPos, const KeyMap::RandomPos &randomPos, quint32 startDelay, float dragSpeed, const QKeyEvent *from);
+ 
+     // android key
+     void processAndroidKey(AndroidKeycode androidKey, const QKeyEvent *from);
+@@ -84,6 +89,10 @@
+     bool m_needBackMouseMove = false;
+     int m_multiTouchID[MULTI_TOUCH_MAX_NUM] = { 0 };
+     KeyMap m_keyMap;
++
++    // 随机散布：缓存 KMT_CLICK 按下时选中的散布点，抬起时复用同一点，
++    // 避免一次点击的 down / up 落在不同坐标被游戏识别为滑动。
++    QHash<int, QPointF> m_scatterCache;
+ 
+     bool m_processMouseMove = true;
+ 
+--- a/src/device/controller/inputconvert/inputconvertgame.cpp
++++ b/src/device/controller/inputconvert/inputconvertgame.cpp
+@@ -4,6 +4,12 @@
+ #include <QTimer>
+ #include <QTime>
+ #include <QRandomGenerator>
++#include <QtGlobal>
++
++#include <cmath>
++#ifndef M_PI
++#define M_PI 3.14159265358979323846
++#endif
+ 
+ #ifdef Q_OS_MACOS
+ #include <CoreGraphics/CoreGraphics.h>
+@@ -77,7 +83,7 @@
+     if (m_needBackMouseMove && KeyMap::KMT_CLICK == node.type && node.data.click.switchMap) {
+         updateSize(frameSize, showSize);
+         // Qt::Key_Tab Qt::Key_M for PUBG mobile
+-        processKeyClick(node.data.click.keyNode.pos, false, node.data.click.switchMap, from);
++        processKeyClick(node.data.click.keyNode.pos, node.data.click.keyNode.random, false, node.data.click.switchMap, from);
+         return;
+     }
+ 
+@@ -115,11 +121,11 @@
+             return;
+         // 处理普通按键
+         case KeyMap::KMT_CLICK:
+-            processKeyClick(node.data.click.keyNode.pos, false, node.data.click.switchMap, from);
++            processKeyClick(node.data.click.keyNode.pos, node.data.click.keyNode.random, false, node.data.click.switchMap, from);
+             processAndroidKey(node.data.click.keyNode.androidKey, from);
+             return;
+         case KeyMap::KMT_CLICK_TWICE:
+-            processKeyClick(node.data.clickTwice.keyNode.pos, true, false, from);
++            processKeyClick(node.data.clickTwice.keyNode.pos, node.data.clickTwice.keyNode.random, true, false, from);
+             processAndroidKey(node.data.clickTwice.keyNode.androidKey, from);
+             return;
+         case KeyMap::KMT_CLICK_MULTI:
+@@ -127,7 +133,7 @@
+             return;
+         case KeyMap::KMT_DRAG:
+             processKeyDrag(node.data.drag.keyNode.pos, node.data.drag.keyNode.extendPos,
+-                         node.data.drag.startDelay, node.data.drag.dragSpeed, from);
++                         node.data.drag.keyNode.random, node.data.drag.startDelay, node.data.drag.dragSpeed, from);
+             return;
+         case KeyMap::KMT_ANDROID_KEY:
+             processAndroidKey(node.data.androidKey.keyNode.androidKey, from);
+@@ -224,6 +230,146 @@
+     absolutePos.setX(m_frameSize.width() * relativePos.x());
+     absolutePos.setY(m_frameSize.height() * relativePos.y());
+     return absolutePos;
++}
++
++// 标准正态随机数（Box-Muller）。Qt 5.15 没有内置正态分布，只好自己来。
++static double nextGauss(QRandomGenerator *rng)
++{
++    double u1 = rng->generateDouble();
++    const double u2 = rng->generateDouble();
++    if (u1 < 1e-12) {
++        u1 = 1e-12;   // log(0) 保护
++    }
++    return std::sqrt(-2.0 * std::log(u1)) * std::cos(2.0 * M_PI * u2);
++}
++
++// 随机散布（改版新增）
++//
++// 坐标说明：keymap 里的 x / y 是相对坐标，x 按画面宽度、y 按画面高度分别归一化。
++// 因此「圆」必须换算到像素空间才是真正的圆，否则会退化成椭圆。
++// 这里统一做法是：两个控制点 -> 像素空间 -> 采样 -> 再换算回相对坐标。
++//
++// 分布说明：默认（RD_UNIFORM）是区域内均匀随机。但**均匀本身就是一种指纹** ——
++// 把落点按等面积同心环或等分格统计计数，各项近似相等，一眼就能看出是程序生成的。
++// 真人按按钮时手指往按钮中间落，中心密、边缘稀，呈钟形。所以 RD_GAUSS 用二维高斯，
++// 并可用 outlier 留一点小概率的大幅偏移做重尾。
++QPointF InputConvertGame::scatterPos(const QPointF &pos, const KeyMap::RandomPos &randomPos)
++{
++    if (!randomPos.isValid() || m_frameSize.width() <= 0 || m_frameSize.height() <= 0) {
++        return pos;
++    }
++
++    QRandomGenerator *rng = QRandomGenerator::global();
++    const double frameW = static_cast<double>(m_frameSize.width());
++    const double frameH = static_cast<double>(m_frameSize.height());
++
++    // 偶发「点偏了」：以 outlier 的概率直接改用区域内均匀采样，制造重尾。
++    // 真人不会每次都精准命中，留一点小概率的大幅偏移比纯高斯更像人。
++    bool forceUniform = false;
++    if (randomPos.outlier > 0.0 && rng->generateDouble() < randomPos.outlier) {
++        forceUniform = true;
++    }
++    const bool useGauss = (KeyMap::RandomPos::RD_GAUSS == randomPos.dist) && !forceUniform;
++
++    if (KeyMap::RandomPos::RS_RECT == randomPos.shape) {
++        // 两个对角点确定矩形；相对坐标下按轴独立采样
++        double x1 = qMin(randomPos.p1.x(), randomPos.p2.x());
++        double x2 = qMax(randomPos.p1.x(), randomPos.p2.x());
++        double y1 = qMin(randomPos.p1.y(), randomPos.p2.y());
++        double y2 = qMax(randomPos.p1.y(), randomPos.p2.y());
++
++        // 限制在屏幕内，避免点到黑边 / 屏幕外
++        x1 = qBound(0.0, x1, 1.0);
++        x2 = qBound(0.0, x2, 1.0);
++        y1 = qBound(0.0, y1, 1.0);
++        y2 = qBound(0.0, y2, 1.0);
++
++        if (!useGauss) {
++            const double rx = rng->generateDouble();
++            const double ry = rng->generateDouble();
++            return QPointF(x1 + (x2 - x1) * rx, y1 + (y2 - y1) * ry);
++        }
++
++        // 高斯：以矩形中心为峰，两轴独立。sigma 相对半宽给出，因此与像素尺寸无关。
++        const double cx = (x1 + x2) * 0.5;
++        const double cy = (y1 + y2) * 0.5;
++        const double sx = qMax((x2 - x1) * 0.5 * randomPos.sigma, 1e-9);
++        const double sy = qMax((y2 - y1) * 0.5 * randomPos.sigma, 1e-9);
++
++        double gx = cx;
++        double gy = cy;
++        for (int i = 0; i < 24; ++i) {
++            gx = cx + sx * nextGauss(rng);
++            gy = cy + sy * nextGauss(rng);
++            if (gx >= x1 && gx <= x2 && gy >= y1 && gy <= y2) {
++                return QPointF(gx, gy);
++            }
++        }
++        // 兜底：夹回矩形内（sigma 很大时才会走到这里，此时分布本来就接近均匀）
++        return QPointF(qBound(x1, gx, x2), qBound(y1, gy, y2));
++    }
++
++    // 圆：p1 为圆心，p2 为圆周上一点
++    const QPointF center = randomPos.p1;
++    const double centerPx = center.x() * frameW;
++    const double centerPy = center.y() * frameH;
++    const double edgePx = randomPos.p2.x() * frameW;
++    const double edgePy = randomPos.p2.y() * frameH;
++
++    const double radiusPx = std::sqrt((edgePx - centerPx) * (edgePx - centerPx) + (edgePy - centerPy) * (edgePy - centerPy));
++    if (radiusPx < 1.0) {
++        return center;
++    }
++
++    double px = centerPx;
++    double py = centerPy;
++
++    if (!useGauss) {
++        // 圆内均匀采样：r = R * sqrt(u)，保证面积均匀（而不是只在圆环上均匀）
++        const double u = rng->generateDouble();
++        const double v = rng->generateDouble();
++        const double r = radiusPx * std::sqrt(u);
++        const double theta = 2.0 * M_PI * v;
++        px = centerPx + r * std::cos(theta);
++        py = centerPy + r * std::sin(theta);
++    } else {
++        // 高斯：像素空间下各向同性，因此屏幕上仍是正圆而不是椭圆。
++        // 用拒绝采样裁到圆内，避免边缘堆积。
++        const double sigmaPx = qMax(radiusPx * randomPos.sigma, 1e-6);
++        bool accepted = false;
++        for (int i = 0; i < 24; ++i) {
++            const double dx = sigmaPx * nextGauss(rng);
++            const double dy = sigmaPx * nextGauss(rng);
++            if (dx * dx + dy * dy <= radiusPx * radiusPx) {
++                px = centerPx + dx;
++                py = centerPy + dy;
++                accepted = true;
++                break;
++            }
++        }
++        if (!accepted) {
++            // 兜底：把最后一次采样径向夹回圆周上
++            double dx = px - centerPx;
++            double dy = py - centerPy;
++            double d = std::sqrt(dx * dx + dy * dy);
++            if (d < 1e-6) {
++                const double theta = 2.0 * M_PI * rng->generateDouble();
++                dx = std::cos(theta);
++                dy = std::sin(theta);
++                d = 1.0;
++            }
++            px = centerPx + dx / d * radiusPx;
++            py = centerPy + dy / d * radiusPx;
++        }
++    }
++
++    // 采样点可能落到屏幕外（圆心贴边时），夹回可视区域。
++    // 注意这里是夹取而非镜像，因此贴边时边缘的概率密度会偏高 ——
++    // 「不点到屏幕外」比「严格均匀」更重要。
++    px = qBound(0.0, px, frameW);
++    py = qBound(0.0, py, frameH);
++
++    return QPointF(px / frameW, py / frameH);
+ }
+ 
+ QPointF InputConvertGame::calcScreenAbsolutePos(QPointF relativePos)
+@@ -392,27 +538,38 @@
+ 
+ // -------- key event --------
+ 
+-void InputConvertGame::processKeyClick(const QPointF &clickPos, bool clickTwice, bool switchMap, const QKeyEvent *from)
++void InputConvertGame::processKeyClick(const QPointF &clickPos, const KeyMap::RandomPos &randomPos, bool clickTwice, bool switchMap, const QKeyEvent *from)
+ {
+     if (switchMap && QEvent::KeyRelease == from->type()) {
+         m_needBackMouseMove = !m_needBackMouseMove;
+         hideMouseCursor(!m_needBackMouseMove);
+     }
+ 
++    const int key = from->key();
++
+     if (QEvent::KeyPress == from->type()) {
+-        int id = attachTouchID(from->key());
+-        sendTouchDownEvent(id, clickPos);
++        // 按下时确定本次点击的坐标，抬起时复用，保证 down / up 落在同一点
++        const QPointF pos = scatterPos(clickPos, randomPos);
++        m_scatterCache.insert(key, pos);
++
++        int id = attachTouchID(key);
++        sendTouchDownEvent(id, pos);
+         if (clickTwice) {
+-            sendTouchUpEvent(getTouchID(from->key()), clickPos);
+-            detachTouchID(from->key());
++            sendTouchUpEvent(getTouchID(key), pos);
++            detachTouchID(key);
++            m_scatterCache.remove(key);
+         }
+     } else if (QEvent::KeyRelease == from->type()) {
++        // 双击映射：抬起时重新散布，形成两次落点不同的点击
++        const QPointF pos = clickTwice ? scatterPos(clickPos, randomPos)
++                                       : m_scatterCache.value(key, clickPos);
+         if (clickTwice) {
+-            int id = attachTouchID(from->key());
+-            sendTouchDownEvent(id, clickPos);
+-        }
+-        sendTouchUpEvent(getTouchID(from->key()), clickPos);
+-        detachTouchID(from->key());
++            int id = attachTouchID(key);
++            sendTouchDownEvent(id, pos);
++        }
++        sendTouchUpEvent(getTouchID(key), pos);
++        detachTouchID(key);
++        m_scatterCache.remove(key);
+     }
+ }
+ 
+@@ -428,7 +585,7 @@
+ 
+     for (int i = 0; i < count; i++) {
+         delay += nodes[i].delay;
+-        clickPos = nodes[i].pos;
++        clickPos = scatterPos(nodes[i].pos, nodes[i].random);
+         QTimer::singleShot(delay, this, [this, key, clickPos]() {
+             int id = attachTouchID(key);
+             sendTouchDownEvent(id, clickPos);
+@@ -469,7 +626,7 @@
+     }
+ }
+ 
+-void InputConvertGame::processKeyDrag(const QPointF &startPos, QPointF endPos, quint32 startDelay, float dragSpeed, const QKeyEvent *from)
++void InputConvertGame::processKeyDrag(const QPointF &startPos, QPointF endPos, const KeyMap::RandomPos &randomPos, quint32 startDelay, float dragSpeed, const QKeyEvent *from)
+ {
+     if (QEvent::KeyPress == from->type()) {
+         // stop last
+@@ -487,15 +644,18 @@
+             m_dragDelayData.pressKey = 0;
+         }
+ 
+-        // start this
++        // start this: 起点允许随机散布（终点跟随同样的位移，保持拖拽向量不变）
++        const QPointF scatteredStart = scatterPos(startPos, randomPos);
++        const QPointF scatteredEnd = endPos + (scatteredStart - startPos);
++
+         int id = attachTouchID(from->key());
+-        sendTouchDownEvent(id, startPos);
++        sendTouchDownEvent(id, scatteredStart);
+ 
+         m_dragDelayData.timer = new QTimer(this);
+         m_dragDelayData.timer->setSingleShot(true);
+         connect(m_dragDelayData.timer, &QTimer::timeout, this, &InputConvertGame::onDragTimer);
+         m_dragDelayData.pressKey = from->key();
+-        m_dragDelayData.currentPos = startPos;
++        m_dragDelayData.currentPos = scatteredStart;
+         m_dragDelayData.queuePos.clear();
+         m_dragDelayData.queueTimer.clear();
+ 
+@@ -508,7 +668,7 @@
+         const quint32 minDelay = static_cast<quint32>(1 + (1.0f - speed) * 29);  // 1 to 30
+         const quint32 maxDelay = minDelay + static_cast<quint32>((1.0f - speed) * 9) + 1;  // // min + (0 to 9) + 1
+ 
+-        getDelayQueue(startPos, endPos,
++        getDelayQueue(scatteredStart, scatteredEnd,
+                       0.01f, 0.0005f,
+                       minDelay,
+                       maxDelay,
+@@ -550,14 +710,18 @@
+     }
+ 
+     if (QEvent::MouseButtonPress == from->type() || QEvent::MouseButtonDblClick == from->type()) {
++        const QPointF pos = scatterPos(node.data.click.keyNode.pos, node.data.click.keyNode.random);
++        m_scatterCache.insert(from->button(), pos);
+         int id = attachTouchID(from->button());
+-        sendTouchDownEvent(id, node.data.click.keyNode.pos);
++        sendTouchDownEvent(id, pos);
+         return true;
+     }
+     if (QEvent::MouseButtonRelease == from->type()) {
++        const QPointF pos = m_scatterCache.value(from->button(), node.data.click.keyNode.pos);
+         int id = getTouchID(from->button());
+-        sendTouchUpEvent(id, node.data.click.keyNode.pos);
++        sendTouchUpEvent(id, pos);
+         detachTouchID(from->button());
++        m_scatterCache.remove(from->button());
+         return true;
+     }
+     return false;
+@@ -680,8 +844,13 @@
+ {
+     Q_UNUSED(from)
+     if (!m_ctrlMouseMove.touching) {
++        const KeyMap::KeyMapNode &mouseMoveNode = m_keyMap.getMouseMoveMap();
+         QPointF mouseMoveStartPos
+-            = m_ctrlMouseMove.smallEyes ? m_keyMap.getMouseMoveMap().data.mouseMove.smallEyes.pos : m_keyMap.getMouseMoveMap().data.mouseMove.startPos;
++            = m_ctrlMouseMove.smallEyes ? mouseMoveNode.data.mouseMove.smallEyes.pos : mouseMoveNode.data.mouseMove.startPos;
++        // 视角拖动起始点可选随机散布（原版 keymap 无该字段时保持固定点）
++        const KeyMap::RandomPos &startRandom
++            = m_ctrlMouseMove.smallEyes ? mouseMoveNode.data.mouseMove.smallEyes.random : mouseMoveNode.data.mouseMove.startRandom;
++        mouseMoveStartPos = scatterPos(mouseMoveStartPos, startRandom);
+         int id = attachTouchID(Qt::ExtraButton24);
+         sendTouchDownEvent(id, mouseMoveStartPos);
+         m_ctrlMouseMove.lastConverPos = mouseMoveStartPos;

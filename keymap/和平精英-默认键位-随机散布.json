@@ -1,0 +1,549 @@
+{
+ "switchKey": "Key_QuoteLeft",
+ "mouseMoveMap": {
+  "startPos": {
+   "x": 0.57,
+   "y": 0.26
+  },
+  "speedRatioX": 3.25,
+  "speedRatioY": 1.25,
+  "speedRatio": 10,
+  "smallEyes": {
+   "comment": "小眼睛",
+   "type": "KMT_CLICK",
+   "key": "Key_Alt",
+   "pos": {
+    "x": 0.8,
+    "y": 0.31
+   },
+   "switchMap": false
+  }
+ },
+ "keyMapNodes": [
+  {
+   "comment": "方向盘",
+   "type": "KMT_STEER_WHEEL",
+   "centerPos": {
+    "x": 0.196,
+    "y": 0.748
+   },
+   "leftOffset": 0.1,
+   "rightOffset": 0.1,
+   "upOffset": 0.27,
+   "downOffset": 0.2,
+   "leftKey": "Key_A",
+   "rightKey": "Key_D",
+   "upKey": "Key_W",
+   "downKey": "Key_S"
+  },
+  {
+   "comment": "开枪",
+   "type": "KMT_CLICK",
+   "key": "LeftButton",
+   "pos": {
+    "x": 0.845,
+    "y": 0.749
+   },
+   "switchMap": false,
+   "randomPos": {
+    "type": "circle",
+    "p1": {
+     "x": 0.845,
+     "y": 0.749
+    },
+    "p2": {
+     "x": 0.856236,
+     "y": 0.749
+    },
+    "dist": "gauss",
+    "sigma": 0.45,
+    "outlier": 0.08
+   }
+  },
+  {
+   "comment": "开镜",
+   "type": "KMT_CLICK",
+   "key": "RightButton",
+   "pos": {
+    "x": 0.93,
+    "y": 0.518
+   },
+   "switchMap": false,
+   "randomPos": {
+    "type": "circle",
+    "p1": {
+     "x": 0.93,
+     "y": 0.518
+    },
+    "p2": {
+     "x": 0.93824,
+     "y": 0.518
+    },
+    "dist": "gauss",
+    "outlier": 0.05
+   }
+  },
+  {
+   "comment": "跳",
+   "type": "KMT_CLICK",
+   "key": "Key_Space",
+   "pos": {
+    "x": 0.928,
+    "y": 0.695
+   },
+   "switchMap": false,
+   "randomPos": {
+    "type": "circle",
+    "p1": {
+     "x": 0.928,
+     "y": 0.695
+    },
+    "p2": {
+     "x": 0.937738,
+     "y": 0.695
+    },
+    "dist": "gauss"
+   }
+  },
+  {
+   "comment": "蹲",
+   "type": "KMT_CLICK",
+   "key": "Key_C",
+   "pos": {
+    "x": 0.839,
+    "y": 0.927
+   },
+   "switchMap": false,
+   "randomPos": {
+    "type": "circle",
+    "p1": {
+     "x": 0.839,
+     "y": 0.927
+    },
+    "p2": {
+     "x": 0.848738,
+     "y": 0.927
+    },
+    "dist": "gauss"
+   }
+  },
+  {
+   "comment": "趴",
+   "type": "KMT_CLICK",
+   "key": "Key_Z",
+   "pos": {
+    "x": 0.918,
+    "y": 0.898
+   },
+   "switchMap": false,
+   "randomPos": {
+    "type": "circle",
+    "p1": {
+     "x": 0.918,
+     "y": 0.898
+    },
+    "p2": {
+     "x": 0.927738,
+     "y": 0.898
+    },
+    "dist": "gauss"
+   }
+  },
+  {
+   "comment": "第一人称",
+   "type": "KMT_CLICK",
+   "key": "Key_V",
+   "pos": {
+    "x": 0.221,
+    "y": 0.946
+   },
+   "switchMap": false,
+   "randomPos": {
+    "type": "circle",
+    "p1": {
+     "x": 0.221,
+     "y": 0.946
+    },
+    "p2": {
+     "x": 0.22924,
+     "y": 0.946
+    },
+    "dist": "gauss"
+   }
+  },
+  {
+   "comment": "快速打药",
+   "type": "KMT_CLICK",
+   "key": "Key_4",
+   "pos": {
+    "x": 0.35,
+    "y": 0.925
+   },
+   "switchMap": false,
+   "randomPos": {
+    "type": "circle",
+    "p1": {
+     "x": 0.35,
+     "y": 0.925
+    },
+    "p2": {
+     "x": 0.360487,
+     "y": 0.925
+    },
+    "dist": "gauss"
+   }
+  },
+  {
+   "comment": "手雷",
+   "type": "KMT_CLICK",
+   "key": "Key_3",
+   "pos": {
+    "x": 0.638,
+    "y": 0.918
+   },
+   "switchMap": false,
+   "randomPos": {
+    "type": "circle",
+    "p1": {
+     "x": 0.638,
+     "y": 0.918
+    },
+    "p2": {
+     "x": 0.648487,
+     "y": 0.918
+    },
+    "dist": "gauss"
+   }
+  },
+  {
+   "comment": "投掷物菜单",
+   "type": "KMT_CLICK",
+   "key": "Key_F1",
+   "pos": {
+    "x": 0.766,
+    "y": 0.925
+   },
+   "switchMap": true,
+   "randomPos": {
+    "type": "circle",
+    "p1": {
+     "x": 0.766,
+     "y": 0.925
+    },
+    "p2": {
+     "x": 0.776487,
+     "y": 0.925
+    },
+    "dist": "gauss"
+   }
+  },
+  {
+   "comment": "药物菜单",
+   "type": "KMT_CLICK",
+   "key": "Key_F2",
+   "pos": {
+    "x": 0.325,
+    "y": 0.855
+   },
+   "switchMap": true,
+   "randomPos": {
+    "type": "circle",
+    "p1": {
+     "x": 0.325,
+     "y": 0.855
+    },
+    "p2": {
+     "x": 0.330993,
+     "y": 0.855
+    },
+    "dist": "gauss"
+   }
+  },
+  {
+   "comment": "换枪1",
+   "type": "KMT_CLICK",
+   "key": "Key_1",
+   "pos": {
+    "x": 0.435,
+    "y": 0.878
+   },
+   "switchMap": false,
+   "randomPos": {
+    "type": "rect",
+    "p1": {
+     "x": 0.418146,
+     "y": 0.853
+    },
+    "p2": {
+     "x": 0.451854,
+     "y": 0.903
+    },
+    "dist": "gauss"
+   }
+  },
+  {
+   "comment": "换枪2",
+   "type": "KMT_CLICK",
+   "key": "Key_2",
+   "pos": {
+    "x": 0.545,
+    "y": 0.878
+   },
+   "switchMap": false,
+   "randomPos": {
+    "type": "rect",
+    "p1": {
+     "x": 0.528146,
+     "y": 0.853
+    },
+    "p2": {
+     "x": 0.561854,
+     "y": 0.903
+    },
+    "dist": "gauss"
+   }
+  },
+  {
+   "comment": "手枪",
+   "type": "KMT_CLICK",
+   "key": "Key_7",
+   "pos": {
+    "x": 0.591,
+    "y": 0.819
+   },
+   "switchMap": false,
+   "randomPos": {
+    "type": "circle",
+    "p1": {
+     "x": 0.591,
+     "y": 0.819
+    },
+    "p2": {
+     "x": 0.599989,
+     "y": 0.819
+    },
+    "dist": "gauss"
+   }
+  },
+  {
+   "comment": "探头",
+   "type": "KMT_CLICK_TWICE",
+   "key": "Key_Q",
+   "pos": {
+    "x": 0.88,
+    "y": 0.462
+   },
+   "randomPos": {
+    "type": "circle",
+    "p1": {
+     "x": 0.88,
+     "y": 0.462
+    },
+    "p2": {
+     "x": 0.889738,
+     "y": 0.462
+    },
+    "dist": "gauss"
+   }
+  },
+  {
+   "comment": "右探头",
+   "type": "KMT_CLICK_TWICE",
+   "key": "Key_E",
+   "pos": {
+    "x": 0.2,
+    "y": 0.35
+   }
+  },
+  {
+   "comment": "下车",
+   "type": "KMT_CLICK",
+   "key": "Key_5",
+   "pos": {
+    "x": 0.885,
+    "y": 0.355
+   },
+   "switchMap": false,
+   "randomPos": {
+    "type": "circle",
+    "p1": {
+     "x": 0.885,
+     "y": 0.355
+    },
+    "p2": {
+     "x": 0.894738,
+     "y": 0.355
+    },
+    "dist": "gauss"
+   }
+  },
+  {
+   "comment": "救人",
+   "type": "KMT_CLICK",
+   "key": "Key_6",
+   "pos": {
+    "x": 0.5,
+    "y": 0.602
+   },
+   "switchMap": false,
+   "randomPos": {
+    "type": "circle",
+    "p1": {
+     "x": 0.5,
+     "y": 0.602
+    },
+    "p2": {
+     "x": 0.510487,
+     "y": 0.602
+    },
+    "dist": "gauss"
+   }
+  },
+  {
+   "comment": "开关门",
+   "type": "KMT_CLICK",
+   "key": "Key_X",
+   "pos": {
+    "x": 0.7,
+    "y": 0.681
+   },
+   "switchMap": false,
+   "randomPos": {
+    "type": "rect",
+    "p1": {
+     "x": 0.679401,
+     "y": 0.656
+    },
+    "p2": {
+     "x": 0.720599,
+     "y": 0.706
+    },
+    "dist": "gauss"
+   }
+  },
+  {
+   "comment": "车加速",
+   "type": "KMT_CLICK",
+   "key": "Key_Shift",
+   "pos": {
+    "x": 0.8,
+    "y": 0.8
+   },
+   "switchMap": false
+  },
+  {
+   "comment": "捡东西1",
+   "type": "KMT_CLICK",
+   "key": "Key_F",
+   "pos": {
+    "x": 0.7,
+    "y": 0.34
+   },
+   "switchMap": false
+  },
+  {
+   "comment": "捡东西2",
+   "type": "KMT_CLICK",
+   "key": "Key_G",
+   "pos": {
+    "x": 0.7,
+    "y": 0.44
+   },
+   "switchMap": false
+  },
+  {
+   "comment": "捡东西3",
+   "type": "KMT_CLICK",
+   "key": "Key_H",
+   "pos": {
+    "x": 0.7,
+    "y": 0.54
+   },
+   "switchMap": false
+  },
+  {
+   "comment": "背包",
+   "type": "KMT_CLICK",
+   "key": "Key_Tab",
+   "pos": {
+    "x": 0.094,
+    "y": 0.909
+   },
+   "switchMap": true,
+   "randomPos": {
+    "type": "circle",
+    "p1": {
+     "x": 0.094,
+     "y": 0.909
+    },
+    "p2": {
+     "x": 0.102989,
+     "y": 0.909
+    },
+    "dist": "gauss"
+   }
+  },
+  {
+   "comment": "持续冲刺",
+   "type": "KMT_CLICK",
+   "key": "Key_Equal",
+   "pos": {
+    "x": 0.196,
+    "y": 0.247
+   },
+   "switchMap": false,
+   "randomPos": {
+    "type": "circle",
+    "p1": {
+     "x": 0.196,
+     "y": 0.247
+    },
+    "p2": {
+     "x": 0.20424,
+     "y": 0.247
+    },
+    "dist": "gauss"
+   }
+  },
+  {
+   "comment": "舔包",
+   "type": "KMT_CLICK",
+   "key": "Key_T",
+   "pos": {
+    "x": 0.72,
+    "y": 0.26
+   },
+   "switchMap": false
+  },
+  {
+   "comment": "地图",
+   "type": "KMT_CLICK",
+   "key": "Key_M",
+   "pos": {
+    "x": 0.98,
+    "y": 0.03
+   },
+   "switchMap": true
+  },
+  {
+   "comment": "消息菜单",
+   "type": "KMT_CLICK",
+   "key": "Key_F3",
+   "pos": {
+    "x": 0.98,
+    "y": 0.34
+   },
+   "switchMap": true
+  },
+  {
+   "comment": "表情菜单",
+   "type": "KMT_CLICK",
+   "key": "Key_F4",
+   "pos": {
+    "x": 0.81,
+    "y": 0.03
+   },
+   "switchMap": true
+  }
+ ]
+}
