@@ -125,13 +125,17 @@ jobs:
       - name: Fetch pinned QtScrcpyCore ${{ env.QTSCRCPYCORE_SHA }}
         shell: pwsh
         run: |
+          # 解压到一个临时子目录，解析完立刻删掉，避免在工作区根目录留下
+          # 一份 QtScrcpyCore-<sha>/（那会让后面的洁净度检查误判）。
           curl.exe -sSL -o core.tar.gz "https://codeload.github.com/barry-ran/QtScrcpyCore/tar.gz/$env:QTSCRCPYCORE_SHA"
           if ($LASTEXITCODE -ne 0) { throw 'download failed' }
-          tar -xzf core.tar.gz
-          $d = Get-ChildItem -Directory | Where-Object { $_.Name -like 'QtScrcpyCore-*' } | Select-Object -First 1
+          New-Item -ItemType Directory -Force -Path '_core_tmp' | Out-Null
+          tar -xzf core.tar.gz -C _core_tmp
+          $d = Get-ChildItem '_core_tmp' -Directory | Select-Object -First 1
           if (-not $d) { throw 'core extraction failed' }
           New-Item -ItemType Directory -Force -Path 'src/QtScrcpy/QtScrcpyCore' | Out-Null
           Copy-Item "$($d.FullName)/*" 'src/QtScrcpy/QtScrcpyCore' -Recurse -Force
+          Remove-Item '_core_tmp','core.tar.gz','app.tar.gz' -Recurse -Force -ErrorAction SilentlyContinue
           if (-not (Test-Path 'src/QtScrcpy/QtScrcpyCore/CMakeLists.txt')) { throw 'unexpected core layout' }
 
       - name: Apply random-scatter patch
@@ -158,15 +162,17 @@ jobs:
           # 静态检查直接跑在打过补丁的树上
           python static_check.py --tree src/QtScrcpy/QtScrcpyCore
           if ($LASTEXITCODE -ne 0) { throw 'static check failed' }
-          # 确认没有把第三方源码带进仓库
-          $vendored = Get-ChildItem -Recurse -File -Include *.cpp,*.h |
-                      Where-Object { $_.FullName -notmatch '\\src\\QtScrcpy\\' }
+          # 确认没有把第三方源码带进仓库：只看 git 跟踪的文件，
+          # 免得把刚拉下来的上游源码误判成「仓库内容」。
+          $tracked = git ls-files 2>$null
+          if (-not $tracked) { $tracked = @() }
+          $vendored = $tracked | Where-Object { $_ -match '\.(cpp|h)$' -and $_ -notmatch '^test_scatter\.cpp$' }
           if ($vendored) {
-            Write-Host "::error::repo contains C++ sources outside the fetched upstream tree"
-            $vendored | ForEach-Object { Write-Host $_.FullName }
+            Write-Host "::error::repo tracks C++ sources outside the fetched upstream tree"
+            $vendored | ForEach-Object { Write-Host $_ }
             throw 'vendored third-party source detected'
           }
-          Write-Host "repo is patch-only: no vendored C++ sources"
+          Write-Host "repo is patch-only: $(($tracked | Measure-Object).Count) tracked files, no vendored C++ sources"
 
       - name: Resolve MSVC environment
         shell: pwsh
