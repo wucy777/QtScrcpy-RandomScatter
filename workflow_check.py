@@ -119,6 +119,7 @@ def main():
         "test_scatter.cpp",
         "workflow_check.py",
         "random-scatter.patch",
+        "package_win.ps1",
     ]
     for r in referenced:
         p = os.path.join(HERE, r)
@@ -167,8 +168,18 @@ def main():
     check("python apply_patch.py src" in text or "apply_patch.py src" in text,
           "apply_patch invoked with the CI layout")
     check("ci\\win\\build_for_win.bat" in text, "uses upstream build script")
-    check("ci\\win\\publish_for_win.bat" in text, "uses upstream publish script")
-    check("working-directory: src" in text, "build/publish run inside the source tree")
+    # 打包刻意不用上游的 publish_for_win.bat：它是 UTF-8 但被 cmd.exe 按 ANSI
+    # 代码页读取，中文注释会变成乱码并报语法错误；它还依赖 Unix 的 cp。
+    # 只看「实际调用」，注释里提到它不算。
+    code_only = "\n".join(l for l in lines if not l.strip().startswith("#"))
+    invoked = re.search(r"(call|cmd\.exe\s*/c|&|\./)\s*[\"']?[^\n\"']*publish_for_win\.bat",
+                        code_only)
+    check(invoked is None,
+          "does NOT invoke upstream publish_for_win.bat (encoding + cp breakage)"
+          if invoked is None else
+          f"still invokes publish_for_win.bat: {invoked.group(0)[:60]}")
+    check("package_win.ps1" in text, "uses our own PowerShell packaging script")
+    check("working-directory: src" in text, "build runs inside the source tree")
 
     # ---------------------------------------------------------- 上游固定
     sha = re.search(r"QTSCRCPYCORE_SHA:\s*([0-9a-f]{40})", text)

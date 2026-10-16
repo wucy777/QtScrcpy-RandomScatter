@@ -121,6 +121,9 @@ def named_step_problems(text):
     GitHub 不强制 step 有名字，但没名字的 step 在 Actions 界面里只显示
     「Run ...」，排查失败时很难对应到具体步骤。所以本项目要求全部命名。
 
+    注意：`run: |` 里的内容是块标量正文，缩进再深也不是序列项，
+    必须跳过，否则多行脚本会被当成一堆缺 name 的 step。
+
     返回 [(行号, 说明)]。空表示通过。
     """
     lines = text.splitlines()
@@ -134,6 +137,22 @@ def named_step_problems(text):
             i += 1
             continue
         indent = len(s) - len(s.lstrip(" "))
+
+        # 刚刚进入了一个块标量（run: | / run: >）：跳到缩进回落的下一行
+        mblock = re.match(r"^\s*[\w.\-]+\s*:\s*[|>][-+]?\s*$", s)
+        if mblock:
+            block_indent = indent
+            i += 1
+            while i < len(lines):
+                s2 = lines[i]
+                if not s2.strip():
+                    i += 1
+                    continue
+                ind2 = len(s2) - len(s2.lstrip(" "))
+                if ind2 <= block_indent:
+                    break
+                i += 1
+            continue
 
         # 离开 steps 块
         if steps_indent is not None and indent <= steps_indent and s.strip():

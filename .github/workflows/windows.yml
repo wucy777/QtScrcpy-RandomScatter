@@ -177,9 +177,8 @@ jobs:
       - name: Resolve MSVC environment
         shell: pwsh
         run: |
-          # build_for_win.bat 靠 cmake 自己找工具链，不需要 vcvarsall；
-          # 但 publish_for_win.bat 要 call 它（为了 windeployqt 和 vc 运行时）。
-          # 不同 runner 镜像的安装位置不一样，这里两个都试一遍。
+          # build_for_win.bat 靠 cmake 自己找工具链，不需要 vcvarsall。
+          # 不同 runner 镜像的安装位置不一样，这里挨个试。
           $cands = @(
             'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat',
             'C:\Program Files (x86)\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat',
@@ -188,12 +187,15 @@ jobs:
             'C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat'
           )
           $v = $cands | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if (-not $v) { throw 'vcvarsall.bat not found on this runner' }
-          Write-Host "vcvarsall: $v"
-          "ENV_VCVARSALL=$v" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          $vc = Split-Path (Split-Path (Split-Path $v -Parent) -Parent) -Parent
-          Write-Host "VC root: $vc"
-          "ENV_VCINSTALL=$vc" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          if ($v) {
+            Write-Host "vcvarsall: $v"
+            "ENV_VCVARSALL=$v" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            $vc = Split-Path (Split-Path (Split-Path $v -Parent) -Parent) -Parent
+            Write-Host "VC root: $vc"
+            "ENV_VCINSTALL=$vc" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          } else {
+            Write-Host "::warning::vcvarsall.bat not found; not needed for the build step"
+          }
 
       - name: Build
         shell: cmd
@@ -203,15 +205,18 @@ jobs:
           call "ci\win\build_for_win.bat" RelWithDebInfo ${{ matrix.msvc-arch }}
         working-directory: src
 
+      # 不用上游的 ci/win/publish_for_win.bat：它是 UTF-8 但被 cmd.exe 当成
+      # ANSI 代码页读，中文注释会变成乱码并导致语法错误；它还调用 Unix 的 cp。
+      # 这里用 PowerShell 做同样的事，编码安全且失败会立刻中断。
       - name: Package
         shell: pwsh
         env:
           ENV_QT_PATH: ${{ github.workspace }}\5.15.2
           PUBLISH_NAME: ${{ env.TARGET_NAME }}-win-${{ matrix.msvc-arch }}-4.2.1
         run: |
-          cmd.exe /c ci\win\publish_for_win.bat ${{ matrix.msvc-arch }} "..\build\$env:PUBLISH_NAME"
-          if (-not (Test-Path "ci\build\$env:PUBLISH_NAME\QtScrcpy.exe")) { throw 'publish produced no exe' }
-        working-directory: src
+          ./package_win.ps1 -RepoRoot . -Arch ${{ matrix.msvc-arch }} `
+                            -OutDir "src/ci/build/$env:PUBLISH_NAME" `
+                            -QtDir "$env:ENV_QT_PATH"
 
       - name: Ship the tuned China keymap with the build
         shell: pwsh
@@ -234,10 +239,19 @@ jobs:
           PUBLISH_NAME: ${{ env.TARGET_NAME }}-win-${{ matrix.msvc-arch }}-4.2.1
         run: |
           $dir = "src\ci\build\$env:PUBLISH_NAME"
+          if (-not (Test-Path $dir)) { throw "package directory missing: $dir" }
           Get-ChildItem $dir | Select-Object -First 30 Name
-          foreach ($need in @('QtScrcpy.exe', 'adb.exe', 'scrcpy-server', 'keymap', 'config')) {
+          foreach ($need in @('QtScrcpy.exe', 'adb.exe', 'scrcpy-server', 'keymap',
+                              'config', 'keymap-tuned', 'Qt5Core.dll', 'Qt5Gui.dll',
+                              'Qt5Widgets.dll')) {
             if (-not (Test-Path "$dir\$need")) { throw "missing in package: $need" }
           }
+          $total = (Get-ChildItem $dir -Recurse -File | Measure-Object -Property Length -Sum).Sum
+          Write-Host ("package: {0} files, {1:N1} MB" -f (Get-ChildItem $dir -Recurse -File).Count, ($total / 1MB))
+          # 随包发布了调教好的键位，确认它真的在里面
+          $tuned = Get-ChildItem "$dir\keymap-tuned" -Filter *.json -ErrorAction SilentlyContinue
+          if (-not $tuned) { throw 'keymap-tuned is empty' }
+          $tuned | ForEach-Object { Write-Host "   tuned keymap: $($_.Name)" }
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
