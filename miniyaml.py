@@ -106,6 +106,65 @@ def validate(text):
     return problems
 
 
+def named_step_problems(text):
+    """检查每个 `steps:` 下的序列项是否都有 `name:`。
+
+    GitHub 不强制 step 有名字，但没名字的 step 在 Actions 界面里只显示
+    「Run ...」，排查失败时很难对应到具体步骤。所以本项目要求全部命名。
+
+    返回 [(行号, 说明)]。空表示通过。
+    """
+    lines = text.splitlines()
+    problems = []
+    steps_indent = None
+    i = 0
+    while i < len(lines):
+        raw = lines[i]
+        s = _strip_comment(raw)
+        if not s.strip():
+            i += 1
+            continue
+        indent = len(s) - len(s.lstrip(" "))
+
+        # 离开 steps 块
+        if steps_indent is not None and indent <= steps_indent and s.strip():
+            if not s.lstrip().startswith("-"):
+                steps_indent = None
+
+        m = re.match(r"^(\s*)steps:\s*$", s)
+        if m:
+            steps_indent = len(m.group(1))
+            i += 1
+            continue
+
+        if steps_indent is not None:
+            im = ITEM_RE.match(s)
+            if im and len(im.group(1)) > steps_indent:
+                dash_indent = len(im.group(1))
+                head = im.group(2)
+                named = bool(re.match(r"^name\s*:", head))
+                if not named:
+                    # 同一个 item 的后续键：缩进比 dash 深，且不是同层的新 item
+                    j = i + 1
+                    while j < len(lines):
+                        s2 = _strip_comment(lines[j])
+                        if not s2.strip():
+                            j += 1
+                            continue
+                        ind2 = len(s2) - len(s2.lstrip(" "))
+                        if ind2 <= dash_indent:
+                            break
+                        if re.match(r"^name\s*:", s2.strip()):
+                            named = True
+                            break
+                        j += 1
+                if not named:
+                    shown = head.strip()[:60] or "(空)"
+                    problems.append((i + 1, "steps 下的序列项缺少 name: —— %s" % shown))
+        i += 1
+    return problems
+
+
 def main():
     import sys
     import os
@@ -113,7 +172,7 @@ def main():
         os.path.dirname(os.path.abspath(__file__)), ".github", "workflows", "windows.yml")
     with open(path, encoding="utf-8") as fp:
         text = fp.read()
-    problems = validate(text)
+    problems = validate(text) + named_step_problems(text)
     if not problems:
         print("miniyaml: OK  %s" % path)
         return 0

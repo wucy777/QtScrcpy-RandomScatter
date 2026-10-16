@@ -43,9 +43,15 @@ def main():
             for jname, job in (jobs_doc or {}).items():
                 if not isinstance(job, dict):
                     continue
-                for s in job.get("steps", []) or []:
-                    check(isinstance(s, dict) and isinstance(s.get("name"), str),
-                          f"{jname}: every step has a plain string name")
+                for si, s in enumerate(job.get("steps", []) or []):
+                    if not (isinstance(s, dict) and isinstance(s.get("name"), str)):
+                        keys = list(s.keys()) if isinstance(s, dict) else type(s).__name__
+                        check(False,
+                              f"{jname}: step #{si + 1} is missing a 'name:' "
+                              f"(keys={keys})")
+                check(all(isinstance(s, dict) and isinstance(s.get("name"), str)
+                          for s in (job.get("steps") or [])),
+                      f"{jname}: every step has a plain string name")
             print("      (validated with PyYAML)")
             parsed = True
         except Exception as e:
