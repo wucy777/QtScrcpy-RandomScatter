@@ -63,10 +63,15 @@ def main():
         p = os.path.join(HERE, r)
         check(os.path.exists(p), f"workflow-referenced file exists: {r}")
 
-    # 仓库必须是 patch-only：不得携带第三方 C++ 源码
+    # 仓库必须是 patch-only：不得携带第三方 C++ 源码。
+    # 注意排除：
+    #   .git / __pycache__          非源码
+    #   files/                      本地开发用的改好的完整文件（已 gitignore）
+    #   src/                        CI 现场拉下来的上游源码（由 apply_patch 生成）
+    SKIP_DIRS = {".git", "__pycache__", "files", "src", "stubs", "_cache", "build"}
     vendored = []
     for root, dirs, files in os.walk(HERE):
-        dirs[:] = [d for d in dirs if d not in (".git", "__pycache__", "files")]
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
         for fn in files:
             if fn.endswith((".cpp", ".h")) and fn != "test_scatter.cpp":
                 vendored.append(os.path.relpath(os.path.join(root, fn), HERE))
