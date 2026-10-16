@@ -98,10 +98,12 @@ jobs:
         id: cache-qt
         uses: actions/cache@v4
         with:
-          path: ${{ github.workspace }}/5.15.2/${{ matrix.qt-arch-install }}
+          # install-qt-action 装到 <dir>/Qt/<version>/<arch>
+          path: ${{ github.workspace }}/Qt/5.15.2/${{ matrix.qt-arch-install }}
           key: ${{ runner.os }}-qt5.15.2-${{ matrix.qt-arch }}
 
       - name: Install Qt 5.15.2
+        id: qt
         uses: jurplel/install-qt-action@v4
         with:
           version: 5.15.2
@@ -109,6 +111,23 @@ jobs:
           arch: ${{ matrix.qt-arch }}
           dir: ${{ github.workspace }}
           cache: ${{ steps.cache-qt.outputs.cache-hit != 'true' }}
+
+      - name: Pin the Qt path used by the build scripts
+        shell: pwsh
+        run: |
+          # install-qt-action 会把 Qt 装到 <dir>/Qt/<version>/<arch>，而
+          # QtScrcpy 自己的构建脚本按 ENV_QT_PATH=<version 目录> 来找
+          # msvc2019_64。这里以 action 导出的 QT_ROOT_DIR 为准反推，
+          # 避免把路径写死。
+          $root = $env:QT_ROOT_DIR            # .../Qt/5.15.2/msvc2019_64
+          if (-not $root) { throw 'QT_ROOT_DIR is not set by install-qt-action' }
+          $qtDir = Split-Path $root -Parent   # .../Qt/5.15.2
+          Write-Host "QT_ROOT_DIR : $root"
+          Write-Host "ENV_QT_PATH : $qtDir"
+          if (-not (Test-Path (Join-Path $qtDir "${{ matrix.qt-arch-install }}\bin\windeployqt.exe"))) {
+            throw "windeployqt.exe not found under $qtDir/${{ matrix.qt-arch-install }}"
+          }
+          "ENV_QT_PATH=$qtDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Fetch upstream QtScrcpy ${{ env.UPSTREAM_TAG }}
         shell: pwsh
@@ -199,8 +218,6 @@ jobs:
 
       - name: Build
         shell: cmd
-        env:
-          ENV_QT_PATH: ${{ github.workspace }}\5.15.2
         run: |
           call "ci\win\build_for_win.bat" RelWithDebInfo ${{ matrix.msvc-arch }}
         working-directory: src
@@ -211,9 +228,9 @@ jobs:
       - name: Package
         shell: pwsh
         env:
-          ENV_QT_PATH: ${{ github.workspace }}\5.15.2
           PUBLISH_NAME: ${{ env.TARGET_NAME }}-win-${{ matrix.msvc-arch }}-4.2.1
         run: |
+          # ENV_QT_PATH 由上一步写进 GITHUB_ENV，这里的 env: 不覆盖它
           ./package_win.ps1 -RepoRoot . -Arch ${{ matrix.msvc-arch }} `
                             -OutDir "src/ci/build/$env:PUBLISH_NAME" `
                             -QtDir "$env:ENV_QT_PATH"

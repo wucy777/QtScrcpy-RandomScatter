@@ -219,6 +219,18 @@ def main():
               if guard else
               f"{name}: prints non-ASCII but does NOT reconfigure stdout to UTF-8")
 
+    # ---------------------------------------------------------- Qt 路径
+    # 踩过坑：install-qt-action 装到 <dir>/Qt/<version>/<arch>，而 QtScrcpy
+    # 的构建脚本按 ENV_QT_PATH=<version 目录> 找 msvc2019_64。写死路径必错。
+    check("QT_ROOT_DIR" in text,
+          "derives ENV_QT_PATH from install-qt-action's QT_ROOT_DIR")
+    hard = re.findall(r"ENV_QT_PATH:\s*\$\{\{\s*github\.workspace\s*\}\}[^\n]*", text)
+    check(not hard,
+          "no hardcoded ENV_QT_PATH in step env (would shadow the resolved value)"
+          if not hard else f"hardcoded ENV_QT_PATH found: {hard}")
+    check(re.search(r"path:\s*\$\{\{\s*github\.workspace\s*\}\}/Qt/", text) is not None,
+          "Qt cache path matches install-qt-action's <dir>/Qt layout")
+
     print()
     if FAIL:
         print(f"WORKFLOW CHECK FAILED: {len(FAIL)}")
