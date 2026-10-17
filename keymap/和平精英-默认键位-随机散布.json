@@ -216,14 +216,14 @@
    }
   },
   {
-   "comment": "投掷物菜单",
+   "comment": "换弹",
    "type": "KMT_CLICK",
-   "key": "Key_F1",
+   "key": "Key_R",
    "pos": {
     "x": 0.771,
     "y": 0.93
    },
-   "switchMap": true,
+   "switchMap": false,
    "randomPos": {
     "type": "circle",
     "p1": {
@@ -231,7 +231,7 @@
      "y": 0.93
     },
     "p2": {
-     "x": 0.780738,
+     "x": 0.779989,
      "y": 0.93
     },
     "dist": "gauss"
@@ -304,23 +304,45 @@
    }
   },
   {
-   "comment": "开关门",
+   "comment": "驾驶",
    "type": "KMT_CLICK",
-   "key": "Key_X",
+   "key": "Key_F5",
    "pos": {
     "x": 0.7,
-    "y": 0.681
+    "y": 0.421
    },
    "switchMap": false,
    "randomPos": {
     "type": "rect",
     "p1": {
-     "x": 0.679401,
-     "y": 0.656
+     "x": 0.662547,
+     "y": 0.386
     },
     "p2": {
-     "x": 0.720599,
-     "y": 0.706
+     "x": 0.737453,
+     "y": 0.456
+    },
+    "dist": "gauss"
+   }
+  },
+  {
+   "comment": "乘坐",
+   "type": "KMT_CLICK",
+   "key": "Key_F6",
+   "pos": {
+    "x": 0.7,
+    "y": 0.537
+   },
+   "switchMap": false,
+   "randomPos": {
+    "type": "rect",
+    "p1": {
+     "x": 0.662547,
+     "y": 0.502
+    },
+    "p2": {
+     "x": 0.737453,
+     "y": 0.572
     },
     "dist": "gauss"
    }
@@ -330,19 +352,41 @@
    "type": "KMT_CLICK",
    "key": "Key_5",
    "pos": {
-    "x": 0.885,
-    "y": 0.355
+    "x": 0.889,
+    "y": 0.357
    },
    "switchMap": false,
    "randomPos": {
     "type": "circle",
     "p1": {
-     "x": 0.885,
-     "y": 0.355
+     "x": 0.889,
+     "y": 0.357
     },
     "p2": {
-     "x": 0.894738,
-     "y": 0.355
+     "x": 0.89724,
+     "y": 0.357
+    },
+    "dist": "gauss"
+   }
+  },
+  {
+   "comment": "开关门",
+   "type": "KMT_CLICK",
+   "key": "Key_X",
+   "pos": {
+    "x": 0.7,
+    "y": 0.682
+   },
+   "switchMap": false,
+   "randomPos": {
+    "type": "rect",
+    "p1": {
+     "x": 0.679401,
+     "y": 0.657
+    },
+    "p2": {
+     "x": 0.720599,
+     "y": 0.707
     },
     "dist": "gauss"
    }
@@ -353,18 +397,18 @@
    "key": "Key_6",
    "pos": {
     "x": 0.5,
-    "y": 0.602
+    "y": 0.601
    },
    "switchMap": false,
    "randomPos": {
     "type": "circle",
     "p1": {
      "x": 0.5,
-     "y": 0.602
+     "y": 0.601
     },
     "p2": {
      "x": 0.510487,
-     "y": 0.602
+     "y": 0.601
     },
     "dist": "gauss"
    }
@@ -435,6 +479,28 @@
    }
   },
   {
+   "comment": "消息菜单",
+   "type": "KMT_CLICK",
+   "key": "Key_F3",
+   "pos": {
+    "x": 0.935,
+    "y": 0.331
+   },
+   "switchMap": true,
+   "randomPos": {
+    "type": "circle",
+    "p1": {
+     "x": 0.935,
+     "y": 0.331
+    },
+    "p2": {
+     "x": 0.941742,
+     "y": 0.331
+    },
+    "dist": "gauss"
+   }
+  },
+  {
    "comment": "右探头",
    "type": "KMT_CLICK_TWICE",
    "key": "Key_E",
@@ -474,16 +540,6 @@
    "switchMap": false
   },
   {
-   "comment": "换弹",
-   "type": "KMT_CLICK",
-   "key": "Key_R",
-   "pos": {
-    "x": 0.795,
-    "y": 0.93
-   },
-   "switchMap": false
-  },
-  {
    "comment": "舔包",
    "type": "KMT_CLICK",
    "key": "Key_T",
@@ -510,16 +566,6 @@
    "pos": {
     "x": 0.98,
     "y": 0.03
-   },
-   "switchMap": true
-  },
-  {
-   "comment": "消息菜单",
-   "type": "KMT_CLICK",
-   "key": "Key_F3",
-   "pos": {
-    "x": 0.98,
-    "y": 0.34
    },
    "switchMap": true
   },
