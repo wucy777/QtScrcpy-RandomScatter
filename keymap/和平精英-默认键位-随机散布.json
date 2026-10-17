@@ -110,19 +110,19 @@
    "type": "KMT_CLICK",
    "key": "Key_C",
    "pos": {
-    "x": 0.839,
-    "y": 0.927
+    "x": 0.836,
+    "y": 0.917
    },
    "switchMap": false,
    "randomPos": {
     "type": "circle",
     "p1": {
-     "x": 0.839,
-     "y": 0.927
+     "x": 0.836,
+     "y": 0.917
     },
     "p2": {
-     "x": 0.848738,
-     "y": 0.927
+     "x": 0.844989,
+     "y": 0.917
     },
     "dist": "gauss"
    }
@@ -132,19 +132,19 @@
    "type": "KMT_CLICK",
    "key": "Key_Z",
    "pos": {
-    "x": 0.918,
-    "y": 0.898
+    "x": 0.92,
+    "y": 0.897
    },
    "switchMap": false,
    "randomPos": {
     "type": "circle",
     "p1": {
-     "x": 0.918,
-     "y": 0.898
+     "x": 0.92,
+     "y": 0.897
     },
     "p2": {
-     "x": 0.927738,
-     "y": 0.898
+     "x": 0.928989,
+     "y": 0.897
     },
     "dist": "gauss"
    }
@@ -177,18 +177,18 @@
    "key": "Key_4",
    "pos": {
     "x": 0.35,
-    "y": 0.925
+    "y": 0.929
    },
    "switchMap": false,
    "randomPos": {
     "type": "circle",
     "p1": {
      "x": 0.35,
-     "y": 0.925
+     "y": 0.929
     },
     "p2": {
      "x": 0.360487,
-     "y": 0.925
+     "y": 0.929
     },
     "dist": "gauss"
    }
@@ -198,19 +198,19 @@
    "type": "KMT_CLICK",
    "key": "Key_3",
    "pos": {
-    "x": 0.638,
-    "y": 0.918
+    "x": 0.646,
+    "y": 0.93
    },
    "switchMap": false,
    "randomPos": {
-    "type": "circle",
+    "type": "rect",
     "p1": {
-     "x": 0.638,
-     "y": 0.918
+     "x": 0.634764,
+     "y": 0.903333
     },
     "p2": {
-     "x": 0.648487,
-     "y": 0.918
+     "x": 0.657236,
+     "y": 0.956667
     },
     "dist": "gauss"
    }
@@ -220,41 +220,19 @@
    "type": "KMT_CLICK",
    "key": "Key_F1",
    "pos": {
-    "x": 0.766,
-    "y": 0.925
+    "x": 0.771,
+    "y": 0.93
    },
    "switchMap": true,
    "randomPos": {
     "type": "circle",
     "p1": {
-     "x": 0.766,
-     "y": 0.925
+     "x": 0.771,
+     "y": 0.93
     },
     "p2": {
-     "x": 0.776487,
-     "y": 0.925
-    },
-    "dist": "gauss"
-   }
-  },
-  {
-   "comment": "药物菜单",
-   "type": "KMT_CLICK",
-   "key": "Key_F2",
-   "pos": {
-    "x": 0.325,
-    "y": 0.855
-   },
-   "switchMap": true,
-   "randomPos": {
-    "type": "circle",
-    "p1": {
-     "x": 0.325,
-     "y": 0.855
-    },
-    "p2": {
-     "x": 0.330993,
-     "y": 0.855
+     "x": 0.780738,
+     "y": 0.93
     },
     "dist": "gauss"
    }
@@ -272,11 +250,11 @@
     "type": "rect",
     "p1": {
      "x": 0.418146,
-     "y": 0.853
+     "y": 0.856333
     },
     "p2": {
      "x": 0.451854,
-     "y": 0.903
+     "y": 0.899667
     },
     "dist": "gauss"
    }
@@ -294,11 +272,11 @@
     "type": "rect",
     "p1": {
      "x": 0.528146,
-     "y": 0.853
+     "y": 0.856333
     },
     "p2": {
      "x": 0.561854,
-     "y": 0.903
+     "y": 0.899667
     },
     "dist": "gauss"
    }
@@ -326,33 +304,25 @@
    }
   },
   {
-   "comment": "探头",
-   "type": "KMT_CLICK_TWICE",
-   "key": "Key_Q",
+   "comment": "开关门",
+   "type": "KMT_CLICK",
+   "key": "Key_X",
    "pos": {
-    "x": 0.88,
-    "y": 0.462
+    "x": 0.7,
+    "y": 0.681
    },
+   "switchMap": false,
    "randomPos": {
-    "type": "circle",
+    "type": "rect",
     "p1": {
-     "x": 0.88,
-     "y": 0.462
+     "x": 0.679401,
+     "y": 0.656
     },
     "p2": {
-     "x": 0.889738,
-     "y": 0.462
+     "x": 0.720599,
+     "y": 0.706
     },
     "dist": "gauss"
-   }
-  },
-  {
-   "comment": "右探头",
-   "type": "KMT_CLICK_TWICE",
-   "key": "Key_E",
-   "pos": {
-    "x": 0.2,
-    "y": 0.35
    }
   },
   {
@@ -400,36 +370,78 @@
    }
   },
   {
-   "comment": "开关门",
-   "type": "KMT_CLICK",
-   "key": "Key_X",
+   "comment": "侧身探头",
+   "type": "KMT_CLICK_TWICE",
+   "key": "Key_Q",
    "pos": {
-    "x": 0.7,
-    "y": 0.681
+    "x": 0.88,
+    "y": 0.462
    },
-   "switchMap": false,
    "randomPos": {
-    "type": "rect",
+    "type": "circle",
     "p1": {
-     "x": 0.679401,
-     "y": 0.656
+     "x": 0.88,
+     "y": 0.462
     },
     "p2": {
-     "x": 0.720599,
-     "y": 0.706
+     "x": 0.889738,
+     "y": 0.462
     },
     "dist": "gauss"
    }
   },
   {
-   "comment": "车加速",
+   "comment": "背包",
    "type": "KMT_CLICK",
-   "key": "Key_Shift",
+   "key": "Key_Tab",
    "pos": {
-    "x": 0.8,
-    "y": 0.8
+    "x": 0.094,
+    "y": 0.909
    },
-   "switchMap": false
+   "switchMap": true,
+   "randomPos": {
+    "type": "circle",
+    "p1": {
+     "x": 0.094,
+     "y": 0.909
+    },
+    "p2": {
+     "x": 0.102989,
+     "y": 0.909
+    },
+    "dist": "gauss"
+   }
+  },
+  {
+   "comment": "自动跑",
+   "type": "KMT_CLICK",
+   "key": "Key_Equal",
+   "pos": {
+    "x": 0.196,
+    "y": 0.247
+   },
+   "switchMap": false,
+   "randomPos": {
+    "type": "circle",
+    "p1": {
+     "x": 0.196,
+     "y": 0.247
+    },
+    "p2": {
+     "x": 0.20424,
+     "y": 0.247
+    },
+    "dist": "gauss"
+   }
+  },
+  {
+   "comment": "右探头",
+   "type": "KMT_CLICK_TWICE",
+   "key": "Key_E",
+   "pos": {
+    "x": 0.2,
+    "y": 0.35
+   }
   },
   {
    "comment": "捡东西1",
@@ -462,48 +474,14 @@
    "switchMap": false
   },
   {
-   "comment": "背包",
+   "comment": "换弹",
    "type": "KMT_CLICK",
-   "key": "Key_Tab",
+   "key": "Key_R",
    "pos": {
-    "x": 0.094,
-    "y": 0.909
+    "x": 0.795,
+    "y": 0.93
    },
-   "switchMap": true,
-   "randomPos": {
-    "type": "circle",
-    "p1": {
-     "x": 0.094,
-     "y": 0.909
-    },
-    "p2": {
-     "x": 0.102989,
-     "y": 0.909
-    },
-    "dist": "gauss"
-   }
-  },
-  {
-   "comment": "持续冲刺",
-   "type": "KMT_CLICK",
-   "key": "Key_Equal",
-   "pos": {
-    "x": 0.196,
-    "y": 0.247
-   },
-   "switchMap": false,
-   "randomPos": {
-    "type": "circle",
-    "p1": {
-     "x": 0.196,
-     "y": 0.247
-    },
-    "p2": {
-     "x": 0.20424,
-     "y": 0.247
-    },
-    "dist": "gauss"
-   }
+   "switchMap": false
   },
   {
    "comment": "舔包",
@@ -512,6 +490,16 @@
    "pos": {
     "x": 0.72,
     "y": 0.26
+   },
+   "switchMap": false
+  },
+  {
+   "comment": "车加速",
+   "type": "KMT_CLICK",
+   "key": "Key_Shift",
+   "pos": {
+    "x": 0.8,
+    "y": 0.8
    },
    "switchMap": false
   },
